@@ -4,7 +4,7 @@
 	"description": "A builder-pattern factory that runs the steps and then builds; (returning a Promise of the returned value from build)",
 	"main": "index.js",
 	"scripts": {
-		"package": "cpx -C {package.json,README.md} package && rollup -c",
+		"build": "cpx -C {package.json,README.md} package && rollup -c",
 		"test": "test"
 	},
 	"author": "Arthur",
@@ -21,5 +21,19 @@
 		"sinon": "^15.0.1",
 		"typescript": "^4.9.4"
 	},
-	"type": "module"
+	"type": "module",
+	"homepage": "https://github.com/Refzlund/build-a-promise",
+	"repository": {
+		"url": "https://github.com/Refzlund/build-a-promise"
+	},
+	"bugs": {
+		"url": "https://github.com/Refzlund/build-a-promise/issues"
+	},
+	"keywords": [
+		"promise",
+		"builder",
+		"builder-pattern",
+		"typescript",
+		"javascript"
+	]
 }
