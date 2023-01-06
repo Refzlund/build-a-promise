@@ -1,6 +1,6 @@
 type MaybePromise<T> = T | Promise<T>
 
-interface BuilderOptions<B> {
+interface BuilderOptions<B, F extends any[]> {
 	/**
 	 * Catches any errors. What this function returns,
 	 * will be the value for the promises reject() function.
@@ -26,6 +26,10 @@ interface BuilderOptions<B> {
 	 * and its returned value will be the resolved value for the promise.
 	*/
 	__build(): MaybePromise<B>
+	/**
+	 * 
+	*/
+	__function?(...args: F): MaybePromise<void>
 }
 
 interface BuilderResolve {
@@ -33,22 +37,22 @@ interface BuilderResolve {
     reject(reason?: any): void
 }
 
-interface BuilderArg<T extends any[], K extends Record<any, any>, B> {
+interface BuilderArg<T extends any[], K extends Record<any, any>, B, F extends any[]> {
     (r: BuilderResolve):
-        | ((...args: T) => K & BuilderOptions<B>)
-        | (() => K & BuilderOptions<B>)
+        | ((...args: T) => K & BuilderOptions<B, F>)
+        | (() => K & BuilderOptions<B, F>)
 }
 
 type Fn = (...args: any) => any
 
-type BuilderRecursive<K extends Record<string, Fn>, B> = {
-    [Key in keyof K]: (...args: Parameters<K[Key]>) => BuilderRecursive<K, B> & Promise<B>
+type BuilderRecursive<K extends Record<string, Fn>, B, F extends any[]> = {
+	[Key in keyof K]: (...args: Parameters<K[Key]>) => (F extends never ? Promise<B> : (...args: F) => Promise<B>) & BuilderRecursive<K, B, F>
 }
 
-type BuilderReturn<K extends Record<string, Fn>, B, T extends any[]> = (...args: T) =>
-    BuilderRecursive<Omit<K, keyof BuilderOptions<B>>, B> & Promise<B>
+type BuilderReturn<K extends Record<string, Fn>, B, T extends any[], F extends any[]> = (...args: T) =>
+	(F extends never ? Promise<B> : (...args: F) => Promise<B>) & BuilderRecursive<Omit<K, keyof BuilderOptions<B, F>>, B, F>
 
-export default function builder<T extends any[], K extends Record<string, Fn>, B>(fn: BuilderArg<T, K, B>): BuilderReturn<K, B, T> {
+export default function builder<T extends any[], K extends Record<string, Fn>, B, F extends any[]>(fn: BuilderArg<T, K, B, F>): BuilderReturn<K, B, T, F> {
     
 	function buildPromise(...args: any) {
 		let resolve: undefined | ((value: unknown) => void),
@@ -62,6 +66,11 @@ export default function builder<T extends any[], K extends Record<string, Fn>, B
 
 		const content = fn({ resolve, reject })(...args)
 		const functions: (() => Promise<void>)[] = []
+
+		const proxyObject = !content.__function ? {} : (...args: any) => {
+			content.__function?.(...args)
+			return proxy
+		}
 
 		setTimeout(async () => {
 			try {
@@ -88,7 +97,7 @@ export default function builder<T extends any[], K extends Record<string, Fn>, B
 			}
 		}, 0)
 
-		const proxy = new Proxy({} as Record<any, any>, {
+		const proxy = new Proxy(proxyObject, {
 			get(target, prop: string) {
 				if (prop === 'then')
 					return promise.then.bind(promise)

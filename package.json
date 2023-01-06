@@ -1,10 +1,10 @@
 {
 	"name": "build-a-promise",
-	"version": "1.0.1",
+	"version": "1.1.0",
 	"description": "A builder-pattern factory that runs the steps and then builds; (returning a Promise of the returned value from build)",
 	"main": "index.js",
 	"scripts": {
-		"build": "cpx -C {package.json,README.md} package && rollup -c",
+		"package": "cpx -C {package.json,README.md} package && rollup -c",
 		"test": "test"
 	},
 	"author": "Arthur",
