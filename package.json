@@ -1,0 +1,25 @@
+{
+	"name": "build-a-promise",
+	"version": "1.0.0",
+	"description": "A builder-pattern factory that runs the steps and then builds; (returning a Promise of the returned value from build)",
+	"main": "index.js",
+	"scripts": {
+		"package": "cpx -C {package.json,README.md} package && rollup -c",
+		"test": "test"
+	},
+	"author": "Arthur",
+	"license": "ISC",
+	"devDependencies": {
+		"@types/chai": "^4.3.4",
+		"@types/mocha": "^10.0.1",
+		"@types/sinon": "^10.0.13",
+		"chai": "^4.3.7",
+		"cpx2": "^4.2.0",
+		"mocha": "^10.2.0",
+		"rollup": "^3.9.1",
+		"rollup-plugin-typescript2": "^0.34.1",
+		"sinon": "^15.0.1",
+		"typescript": "^4.9.4"
+	},
+	"type": "module"
+}
