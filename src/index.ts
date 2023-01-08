@@ -1,6 +1,6 @@
 type MaybePromise<T> = T | Promise<T>
 
-interface BuilderOptions<__B, F extends any[], __I, __S, __F> {
+interface BuilderOptions<__B, __I, __S> {
 	/**
 	 * Catches any errors. What this function returns,
 	 * will be the value for the promises reject() function.
@@ -26,10 +26,6 @@ interface BuilderOptions<__B, F extends any[], __I, __S, __F> {
 	 * and its returned value will be the resolved value for the promise.
 	*/
 	__build?(): MaybePromise<__B>
-	/**
-	 * 
-	*/
-	__function?(...args: F): MaybePromise<__F>
 }
 
 interface BuilderResolve {
@@ -37,34 +33,42 @@ interface BuilderResolve {
     reject(reason?: any): void
 }
 
-interface BuilderArg<T extends any[], K extends Record<any, any>, __B, F extends any[], __I, __S, __F> {
-    (r: BuilderResolve):
-        | ((...args: T) => K & BuilderOptions<__B, F, __I, __S, __F>)
-        | (() => K & BuilderOptions<__B, F, __I, __S, __F>)
+interface BuilderArg<T extends any[], K extends Record<any, any>, __B, __I, __S, F extends any[]> {
+	(r: BuilderResolve):
+		| ((...args: T) => K & BuilderOptions<__B, __I, __S>)
+		| ((...args: T) => (...args: F) => K & BuilderOptions<__B, __I, __S>)
 }
 
 type Fn = (...args: any) => any
 
 type NonVoidable<T> = T extends void ? never : T
 type VoidAsUndefined<T> = T extends void ? undefined : T 
-type BuilderPromise<__B, __I, __S, __F, More = never> =
-	Promise<VoidAsUndefined<__B> | NonVoidable<__I> | NonVoidable<__S> | NonVoidable<__F> | NonVoidable<More>>
+type BuilderPromise<__B, __I, __S, More = never> =
+	Promise<VoidAsUndefined<__B> | NonVoidable<__I> | NonVoidable<__S>| NonVoidable<More>>
 
-type BuilderRecursive<K extends Record<string, Fn>, __B, F extends any[], __I, __S, __F, More = never> = {
-	
-	[Key in keyof K]: (...args: Parameters<K[Key]>) => (F extends never ? BuilderPromise<__B, __I, __S, __F, More | ReturnType<K[Key]>> : (...args: F) => BuilderPromise<__B, __I, __S, __F, More | ReturnType<K[Key]>>) & BuilderRecursive<K, __B, F, __I, __S, __F, More | ReturnType<K[Key]>>
-
+type BuilderRecursive<K extends Record<string, Fn>, __B, __I, __S, F extends any[], More = never> = {
+	[Key in keyof K]: (...args: Parameters<K[Key]>) =>
+		(
+			F extends [never]
+				? BuilderPromise<__B, __I, __S, More | ReturnType<K[Key]>>
+				: (...args: F) => BuilderPromise<__B, __I, __S, More | ReturnType<K[Key]>>
+		)
+		& BuilderRecursive<K, __B, __I, __S, F, More | ReturnType<K[Key]>>
 }
 
-type BuilderReturn<K extends Record<string, Fn>, B, T extends any[], F extends any[], __I, __S, __F> = (...args: T) =>
-	(F extends never ? BuilderPromise<B, __I, __S, __F> : (...args: F) => BuilderPromise<B, __I, __S, __F>)
-	& BuilderRecursive<Omit<K, keyof BuilderOptions<B, F, __I, __S, __F>>, B, F, __I, __S, __F>
+type BuilderReturn<K extends Record<string, Fn>, B, T extends any[], __I, __S, __F, F extends any[]> = (...args: T) =>
+	(
+		F extends [never]
+			? BuilderPromise<B, __I, __S, __F>
+			: (...args: F) => BuilderPromise<B, __I, __S, __F>
+	)
+	& BuilderRecursive<Omit<K, keyof BuilderOptions<B, __I, __S>>, B, __I, __S, F>
 
-const MISSING_PROMISE = 'Error occured: Missing Resolve or Reject functions for the promise'
+const MISSING_PROMISE = 'Missing Resolve or Reject functions for the promise'
 
 export default function builder
-	<T extends any[], K extends Record<string, Fn>, B, F extends any[], __I, __S, __F>
-	(fn: BuilderArg<T, K, B, F, __I, __S, __F>): BuilderReturn<K, B, T, F, __I, __S, __F> {
+	<T extends any[], K extends Record<string, Fn>, B, __I, __S, __F, F extends any[] = [never]>
+	(fn: BuilderArg<T, K, B, __I, __S, F>): BuilderReturn<K, B, T, __I, __S, __F, F> {
 
 	function buildPromise(...args: any) {
 		let resolve: undefined | ((value: unknown) => void),
@@ -76,8 +80,9 @@ export default function builder
 		})
 		if (!resolve || !reject) throw new Error(MISSING_PROMISE)
 
-		const content = fn({ resolve, reject })(...args)
-		const functions: (() => Promise<void>)[] = []
+		let content = fn({ resolve, reject })(...args)
+		
+		const functions: ((content: Record<any,any>) => Promise<any>)[] = []
 
 		const returnsValue = (value: any) => {
 			if (!resolve) throw new Error(MISSING_PROMISE)
@@ -86,20 +91,20 @@ export default function builder
 			return typeof value !== 'undefined'
 		}
 
-		let __fnReturn: any
-		const proxyObject = !content.__function ? {} : (...args: any) => {
-			__fnReturn = content.__function?.(...args)
+		const proxyObject = typeof content !== 'function' ? {} : (...args: any) => {
+			if(typeof content === 'function')
+				content = content(...args)
 			return proxy
 		}
 
 		setTimeout(async () => {
+			if (typeof content === 'function')
+				throw new Error('Something went wrong when building promise...')
 			try {
-				if (returnsValue(__fnReturn))
-					return
 				if (returnsValue(await content.__init?.()))
 					return
 				for (const fn of functions) {
-					if (returnsValue(await fn()))
+					if (returnsValue(await fn(content)))
 						return
 					if (returnsValue(await content.__step?.()))
 						return
@@ -132,7 +137,7 @@ export default function builder
 					return promise.finally.bind(promise)
 				
 				return (...args: any) => {
-					functions.push(async () => await content[prop](...args))
+					functions.push(async (content) => await content[prop](...args))
 					return proxy
 				}
 			}
