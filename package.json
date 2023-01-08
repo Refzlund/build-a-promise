@@ -1,6 +1,6 @@
 {
 	"name": "build-a-promise",
-	"version": "1.2.0",
+	"version": "2.0.0",
 	"description": "A builder-pattern factory that runs the steps and then builds; (returning a Promise of the returned value from build)",
 	"main": "index.js",
 	"scripts": {
